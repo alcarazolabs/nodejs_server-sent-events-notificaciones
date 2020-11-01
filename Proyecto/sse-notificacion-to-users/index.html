@@ -1,0 +1,190 @@
+<html>
+    <head>
+        <title>Server-Sent Events - Notification Demo</title>
+        <script src="js/jquery-3.5.1.min.js" crossorigin="anonymous"></script>
+        <link rel="stylesheet" type="text/css" href="css/css.css">
+        <script src="js/bootstrap.min.js"></script> 
+        <link rel="stylesheet" href="css/bootstrap.min.css">
+    </head>
+
+<body>
+<div class="container">
+<div class="row">
+
+   
+
+    <div class="col" id="user-profile">
+            <img src="img/user1.png" width="100" height="100" alt="User #1">
+            <h4>- Freddy </h4>
+            <strong>I'm the user #1</strong>
+            <p>Contact: user1@email.com</p>
+            <hr>
+          
+    </div>
+    <div class="col">
+        <div class="tasks-container">
+            <img id="notification-icon" src="img/bellnormal.png" width="20" height="20">
+            <div id="tasks">
+                
+            </div>
+    </div>
+    </div>
+
+    
+    <div class="col"></div>
+
+</div>
+</div>
+    <script type="text/javascript">
+
+        document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+           //reconnect
+        }
+        });
+
+        const iduser="5f962e6bb226a56b2b579ba8"
+        let eventSource = new EventSource(`http://localhost:3000/api/tasks/subscription?iduser=${iduser}`);
+
+        eventSource.addEventListener('newUserTaskNotification_'+iduser, (e) => {
+            var data = JSON.parse(e.data)
+            console.log(data)
+            //agregar clase al notification-icon "campana" a la roja.
+            $("#notification-icon").addClass("notification-1")
+            $("#notification-icon").attr("src", "img/bellred.png")
+            //add the notification content to the div tasks. Data is comming the task
+            $("#tasks").prepend(`
+            <li id='${data.notification.idtask}' class='novisto'>${data.notification.name} - ${getFormattedDate(data.notification.date)}</li>
+            `)
+        });
+
+        // listens to all the messages. The only way to catch unnamed events (with no `event` name set)
+        eventSource.onmessage = message => {
+          //console.log(message);
+        };
+
+        $( ()=>{
+                //Load tasks
+                getTasks()
+                getTaskNotificationStatus()
+                $("#notification-icon").click(function(){
+
+                    if( $("#notification-icon").hasClass("notification-1") ){
+                        //remove the class notification-1
+                        $("#notification-icon").removeClass("notification-1")  
+                        $("#notification-icon").attr("src", "img/bellnormal.png")
+                        changeUserNotificationStatus()
+                    }
+
+                    if($("#tasks").is(":visible")){
+                        $("#tasks").hide()
+                    }else{
+                        $("#tasks").show()
+                    } 
+                });
+        
+             $(document).on("click", "div#tasks li", function(){
+                let idtask = $(this).attr('id')
+                
+                if($(this).hasClass('novisto')){
+                    var data = {
+                    idtask: idtask
+                    }
+                   $(this).removeClass('novisto')
+                   $(this).addClass('visto')
+                   changeTaskStatus(data)
+                }
+               
+               
+            });
+        });
+
+        function setTaks(data){
+         //put the task over the div 'tasks'
+            if(data.status==1){
+                $("#tasks").append(`
+                <li id='${data._id}' class='novisto'>${data.name} - ${getFormattedDate(data.date)}</li>
+                `)
+            }else{
+                $("#tasks").append(`
+                <li id='${data._id}' class='visto'>${data.name} - ${getFormattedDate(data.date)}</li>
+                `)
+            }
+          
+        }
+
+        function getTasks(){
+            //get of the tasks of the user
+            $.ajax({
+                    url: "http://192.168.0.10:3000/api/tasks/mytasks",
+                    data: {iduser: iduser},
+                    success: function(data) {
+                      data.forEach(setTaks);
+                    },
+                    error: function(error) {
+                        console.log(error)
+                    }
+                });
+            }
+            function getTaskNotificationStatus(){
+                //get status of Notification of the user to change bell-icon
+                $.ajax({
+                    url: "http://192.168.0.10:3000/api/tasks/task_notification_status",
+                    data: {iduser: iduser},
+                    success: function(data) {
+                      setNotificationStatus(data)
+                    },
+                    error: function(error) {
+                        console.log(error)
+                    }
+                });
+            }   
+            function setNotificationStatus(data){
+                if(data.status===1){
+                    $("#notification-icon").attr("src", "img/bellred.png");
+                    $("#notification-icon").addClass("notification-1");
+                }
+            }
+            function changeUserNotificationStatus(){
+                var obj = {
+                    iduser:iduser
+                }
+                console.log(obj)
+                $.post('http://192.168.0.10:3000/api/tasks/change_user_notification_status', obj, (data)=>{
+                    
+                    if(data.data==="ok"){
+                        console.log("notification status changed")
+                    }else{
+                       console.log(data.error)
+                       
+                    }
+                });
+            }
+
+            function getFormattedDate(date){
+                if(date!=null){
+                var mydate = new Date(date);
+                var day = mydate.getDate()
+                var month = mydate.getMonth()+1
+                var year = mydate.getFullYear()
+                var time = mydate.toLocaleTimeString()
+                const mdate = day+"/"+month+"/"+year+" ("+time+")"
+                    return mdate
+                }else{
+                    return "no date"
+                }
+            }
+            function changeTaskStatus(task){
+                $.post('http://192.168.0.10:3000/api/tasks/change_task_status', task, (data)=>{
+                    
+                    if(data.data==="ok"){
+                        console.log("task status changed")
+                    }else{
+                       console.log(data.error)
+                    }
+                });
+            }
+    </script>
+</body>
+
+</html>
